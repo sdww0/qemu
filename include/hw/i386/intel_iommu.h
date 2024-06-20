@@ -294,6 +294,7 @@ struct IntelIOMMUState {
 
     /* interrupt remapping */
     bool intr_enabled;              /* Whether guest enabled IR */
+    bool cfi_enabled;               /* Whether compatibility format interrupt is accpetable*/
     dma_addr_t intr_root;           /* Interrupt remapping table pointer */
     uint32_t intr_size;             /* Number of IR table entries */
     bool intr_eime;                 /* Extended interrupt mode enabled */
