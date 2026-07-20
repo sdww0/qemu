@@ -65,6 +65,7 @@
 #include "monitor/qdev.h"
 #include "net/net.h"
 #include "net/slirp.h"
+#include "system/zion-cvm.h"
 #include "monitor/monitor.h"
 #include "ui/console.h"
 #include "ui/input.h"
@@ -3408,6 +3409,9 @@ void qemu_init(int argc, char **argv)
                     }
                     break;
                 }
+            case QEMU_OPTION_zion_cvm:
+                zion_cvm_enable();
+                break;
             case QEMU_OPTION_accel:
                 accel_opts = qemu_opts_parse_noisily(qemu_find_opts("accel"),
                                                      optarg, true);

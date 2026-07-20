@@ -52,6 +52,7 @@ struct RISCVVirtState {
     DeviceState *irqchip[VIRT_SOCKETS_MAX];
     PFlashCFI01 *flash[2];
     FWCfgState *fw_cfg;
+    MemoryRegion zion_shared_mem;
 
     int fdt_size;
     bool have_aclint;

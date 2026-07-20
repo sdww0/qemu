@@ -12,6 +12,7 @@
 
 #include "qemu/osdep.h"
 #include "system/kvm.h"
+#include "system/zion-cvm.h"
 #include "hw/pci/msi.h"
 
 KVMState *kvm_state;
@@ -114,6 +115,11 @@ bool kvm_dirty_ring_enabled(void)
 uint32_t kvm_dirty_ring_size(void)
 {
     return 0;
+}
+
+int zion_cvm_load_memory(hwaddr addr, const void *buf, hwaddr len)
+{
+    return -ENOSYS;
 }
 
 bool kvm_hwpoisoned_mem(void)

@@ -216,6 +216,16 @@ SRST
     Define an SGX EPC section.
 ERST
 
+DEF("zion-cvm", 0, QEMU_OPTION_zion_cvm,
+    "-zion-cvm          enable Zion confidential VM support\n",
+    QEMU_ARCH_RISCV)
+SRST
+``-zion-cvm``
+    Enable Zion confidential VM support. This selects the Zion KVM VM type
+    and adds the shared-memory region used by the Zion runtime. KVM is
+    required.
+ERST
+
 DEF("cpu", HAS_ARG, QEMU_OPTION_cpu,
     "-cpu cpu        select CPU ('-cpu help' for list)\n", QEMU_ARCH_ALL)
 SRST

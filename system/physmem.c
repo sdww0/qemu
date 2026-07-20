@@ -57,6 +57,7 @@
 #include "system/hw_accel.h"
 #include "system/xen-mapcache.h"
 #include "trace.h"
+#include "system/zion-cvm.h"
 
 #ifdef CONFIG_FALLOCATE_PUNCH_HOLE
 #include <linux/falloc.h>
@@ -3190,6 +3191,37 @@ enum write_rom_type {
     FLUSH_CACHE,
 };
 
+static bool zion_cvm_enabled;
+static hwaddr zion_cvm_mem_base;
+static uint64_t zion_cvm_mem_size;
+
+void zion_cvm_enable(void)
+{
+    zion_cvm_enabled = true;
+}
+
+bool zion_cvm_is_enabled(void)
+{
+    return zion_cvm_enabled;
+}
+
+void zion_cvm_set_memory_region(hwaddr addr, uint64_t size)
+{
+    zion_cvm_mem_base = addr;
+    zion_cvm_mem_size = size;
+}
+
+bool zion_cvm_memory_contains(hwaddr addr, hwaddr len)
+{
+    if (!zion_cvm_enabled || !zion_cvm_mem_size) {
+        return false;
+    }
+
+    return addr >= zion_cvm_mem_base &&
+           len <= zion_cvm_mem_size &&
+           addr - zion_cvm_mem_base <= zion_cvm_mem_size - len;
+}
+
 static inline MemTxResult address_space_write_rom_internal(AddressSpace *as,
                                                            hwaddr addr,
                                                            MemTxAttrs attrs,
@@ -3215,8 +3247,22 @@ static inline MemTxResult address_space_write_rom_internal(AddressSpace *as,
             ram_ptr = qemu_map_ram_ptr(mr->ram_block, addr1);
             switch (type) {
             case WRITE_DATA:
-                memcpy(ram_ptr, buf, l);
-                invalidate_and_set_dirty(mr, addr1, l);
+                if (zion_cvm_memory_contains(addr, l)) {
+                    int ret;
+
+                    ret = zion_cvm_load_memory(addr, buf, l);
+                    if (ret < 0) {
+                        error_report("failed to load Zion CVM memory: "
+                                     "addr=0x%" HWADDR_PRIx
+                                     " size=0x%" HWADDR_PRIx
+                                     " ret=%d",
+                                     addr, l, ret);
+                        return MEMTX_ERROR;
+                    }
+                } else {
+                    memcpy(ram_ptr, buf, l);
+                    invalidate_and_set_dirty(mr, addr1, l);
+                }
                 break;
             case FLUSH_CACHE:
                 flush_idcache_range((uintptr_t)ram_ptr, (uintptr_t)ram_ptr, l);

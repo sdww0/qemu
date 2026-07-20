@@ -51,6 +51,7 @@
 #include "system/kvm.h"
 #include "system/tpm.h"
 #include "system/qtest.h"
+#include "system/zion-cvm.h"
 #include "hw/pci/pci.h"
 #include "hw/pci-host/gpex.h"
 #include "hw/display/ramfb.h"
@@ -109,6 +110,9 @@ static const MemMapEntry virt_memmap[] = {
 
 /* PCIe high mmio for RV64, size is fixed but base depends on top of RAM */
 #define VIRT64_HIGH_PCIE_MMIO_SIZE  (16 * GiB)
+
+#define ZION_CVM_SHARED_MEM_BASE    0x4000000000ULL
+#define ZION_CVM_SHARED_MEM_SIZE    (128 * MiB)
 
 static MemMapEntry virt_high_pcie_memmap;
 
@@ -1524,7 +1528,6 @@ static void virt_machine_done(Notifier *notifier, void *data)
         virt_acpi_setup(s);
     }
 }
-
 static void virt_machine_init(MachineState *machine)
 {
     RISCVVirtState *s = RISCV_VIRT_MACHINE(machine);
@@ -1673,6 +1676,19 @@ static void virt_machine_init(MachineState *machine)
     /* register system main memory (actual RAM) */
     memory_region_add_subregion(system_memory, s->memmap[VIRT_DRAM].base,
                                 machine->ram);
+
+    if (zion_cvm_is_enabled()) {
+        if (!kvm_enabled()) {
+            error_report("Zion CVM support requires KVM");
+            exit(EXIT_FAILURE);
+        }
+
+        memory_region_init_ram(&s->zion_shared_mem, OBJECT(machine),
+                               "riscv_virt_board.zion-shared-mem",
+                               ZION_CVM_SHARED_MEM_SIZE, &error_fatal);
+        memory_region_add_subregion(system_memory, ZION_CVM_SHARED_MEM_BASE,
+                                    &s->zion_shared_mem);
+    }
 
     /* boot rom */
     memory_region_init_rom(mask_rom, NULL, "riscv_virt_board.mrom",

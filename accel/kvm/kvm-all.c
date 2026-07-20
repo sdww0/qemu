@@ -53,6 +53,7 @@
 
 #include "hw/boards.h"
 #include "system/stats.h"
+#include "system/zion-cvm.h"
 
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
@@ -389,6 +390,11 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot, boo
         ret = kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem);
     }
     slot->old_flags = mem.flags;
+    if (zion_cvm_is_enabled() && mem.memory_size &&
+        ZION_CVM_KERNEL_LOAD_ADDR >= mem.guest_phys_addr &&
+        ZION_CVM_KERNEL_LOAD_ADDR - mem.guest_phys_addr < mem.memory_size) {
+        zion_cvm_set_memory_region(mem.guest_phys_addr, mem.memory_size);
+    }
 err:
     trace_kvm_set_user_memory(mem.slot >> 16, (uint16_t)mem.slot, mem.flags,
                               mem.guest_phys_addr, mem.memory_size,
@@ -2494,6 +2500,32 @@ bool kvm_dirty_ring_enabled(void)
     return kvm_state && kvm_state->kvm_dirty_ring_size;
 }
 
+int zion_cvm_load_memory(hwaddr addr, const void *buf, hwaddr len)
+{
+    struct cvm_load_mem_para mem_para;
+    const uint8_t *source = buf;
+    hwaddr offset = 0;
+
+    if (!kvm_state) {
+        return -ENODEV;
+    }
+
+    /* Ensure lazy source mappings are resident before entering the kernel. */
+    while (offset < len) {
+        size_t page_offset = ((uintptr_t)source + offset) % PAGE_SIZE;
+        hwaddr step = MIN((hwaddr)(PAGE_SIZE - page_offset), len - offset);
+
+        (void)qatomic_read(source + offset);
+        offset += step;
+    }
+
+    mem_para.stash = (unsigned long)(uintptr_t)buf;
+    mem_para.pos = (unsigned long)addr;
+    mem_para.size = (unsigned long)len;
+
+    return kvm_vm_ioctl(kvm_state, CVM_LOAD_MEM, &mem_para);
+}
+
 static void query_stats_cb(StatsResultList **result, StatsTarget target,
                            strList *names, strList *targets, Error **errp);
 static void query_stats_schemas_cb(StatsSchemaList **result, Error **errp);
@@ -2506,6 +2538,10 @@ uint32_t kvm_dirty_ring_size(void)
 static int do_kvm_create_vm(KVMState *s, int type)
 {
     int ret;
+
+    if (zion_cvm_is_enabled()) {
+        type = ZION_CVM_KVM_TYPE;
+    }
 
     do {
         ret = kvm_ioctl(s, KVM_CREATE_VM, type);
