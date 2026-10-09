@@ -1683,7 +1683,8 @@ static void virt_machine_init(MachineState *machine)
             exit(EXIT_FAILURE);
         }
 
-        memory_region_init_ram(&s->zion_shared_mem, OBJECT(machine),
+        /* MachineState is not a DeviceState; register this RAM globally. */
+        memory_region_init_ram(&s->zion_shared_mem, NULL,
                                "riscv_virt_board.zion-shared-mem",
                                ZION_CVM_SHARED_MEM_SIZE, &error_fatal);
         memory_region_add_subregion(system_memory, ZION_CVM_SHARED_MEM_BASE,
